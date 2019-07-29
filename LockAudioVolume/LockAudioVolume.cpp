@@ -3,19 +3,79 @@
 
 #include "pch.h"
 #include <iostream>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <mmdeviceapi.h>
+#include <audiopolicy.h>
 
-int main()
+int WINAPI WinMain(
+	HINSTANCE hInstance,     /* [input] handle to current instance */
+	HINSTANCE hPrevInstance, /* [input] handle to previous instance */
+	LPSTR lpCmdLine,         /* [input] pointer to command line */
+	int nCmdShow             /* [input] show state of window */
+)
 {
-    std::cout << "Hello World!\n"; 
+	const CLSID CLSID_MMDeviceEnumerator = __uuidof(MMDeviceEnumerator);
+	const IID IID_IMMDeviceEnumerator = __uuidof(IMMDeviceEnumerator);
+	IMMDeviceEnumerator* pEnumerator;
+
+	CoInitialize(nullptr);
+
+	HRESULT hr;
+	hr = CoCreateInstance(
+		CLSID_MMDeviceEnumerator, NULL,
+		CLSCTX_ALL, IID_IMMDeviceEnumerator,
+		(void**)&pEnumerator);
+
+	if (hr != S_OK)
+	{
+		return 1;
+	}
+
+	IMMDevice* pDevice;
+	hr = pEnumerator->GetDefaultAudioEndpoint(EDataFlow::eCapture, ERole::eCommunications, &pDevice);
+	if (hr != S_OK)
+	{
+		return 1;
+	}
+	pEnumerator->Release();
+
+	IAudioSessionManager* pManager;
+	const IID IID_IMMAudioSessionManager = __uuidof(IAudioSessionManager);
+	hr = pDevice->Activate(IID_IMMAudioSessionManager, CLSCTX_ALL, nullptr, (void**)&pManager);
+
+	if (hr != S_OK)
+	{
+		return 1;
+	}
+
+	pDevice->Release();
+
+	ISimpleAudioVolume* pSimpleAudioVolume;
+	hr = pManager->GetSimpleAudioVolume(nullptr, true, &pSimpleAudioVolume);
+
+	if (hr != S_OK)
+	{
+		return 1;
+	}
+
+	pManager->Release();
+
+
+	float Volume = 0.0f;
+	const float TargetVolume = 0.99f;
+
+	while (true)
+	{
+		hr = pSimpleAudioVolume->GetMasterVolume(&Volume);
+		if (Volume != TargetVolume)
+		{
+			pSimpleAudioVolume->SetMasterVolume(TargetVolume, nullptr);
+		}
+		Sleep(1000);
+	}
+
+	pSimpleAudioVolume->Release();
+
+	return 0;
 }
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
